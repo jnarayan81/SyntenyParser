@@ -1,6 +1,8 @@
 # SyntenyParser
 
-maf2syntenyparser script usage
+Report bug to Jitendra Narayan ( jnarayan81@gmail.com )
+
+SyntenyParser script usage
 
 ```
   print "Usage: $0 --qfile --flip 1 \n\n";
