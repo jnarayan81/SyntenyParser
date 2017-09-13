@@ -10,7 +10,7 @@ use Chromosome::Map;
  
 # maf2synteny parser
 #Author: Jitendra Narayan
-#Usage: perl maf2syntenyparser.pl -q blocks_coords.txt -f 1 -c 40 -o sampleOut -r ref -t tar -p scaffold_2
+#Usage: perl SyntenyParser.pl -q blocks_coords.txt -f 1 -c 40 -o sampleOut -r ref -t tar -p scaffold_2
 
 #print "\nNOTE: The script assume each blocks number has two only lines in your blocks_coords.txt file\n";
 
@@ -217,7 +217,7 @@ return %terms;
 #Help section
 sub help {
   my $ver = $_[0];
-  print "\n maf2syntenyparser.pl $ver\n";
+  print "\n SyntenyParser.pl $ver\n";
   print "\n Report errors/bug to Jitendra 'jnarayan81ATgmail.com'\n\n";
 
   print "Usage: $0 --qfile --flip 1 \n\n";
