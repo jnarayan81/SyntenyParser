@@ -1,0 +1,2 @@
+# SyntenyParser
+Parse the syntney
