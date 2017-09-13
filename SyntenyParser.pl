@@ -36,6 +36,7 @@ if (!$qfile or !$flip or !$core or !$ofile) { help($version) }
 
 if ($core > 1) { print "\nWARNING: Might distort the outfile, use more core/thread at your own risk\n---Advised to use 1 thread for now---\n";}
 
+if ($block and $plot) { print "\nSorry plotting function is available with default option of blocks creation\n Try without -b flag\n"; exit; }
 #Seperator
 local $/ = "--------------------------------------------------------------------------------";
 
