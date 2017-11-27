@@ -10,14 +10,14 @@ use Chromosome::Map;
  
 # maf2synteny parser
 #Author: Jitendra Narayan
-#Usage: perl SyntenyParser.pl -q blocks_coords.txt -f 1 -c 40 -o sampleOut -r ref -t tar -p scaffold_2
+#Usage: perl SyntenyParser.pl -a blocks_coords.txt -f 1 -c 40 -o sampleOut -r ref -t tar -p scaffold_2
 
 #print "\nNOTE: The script assume each blocks number has two only lines in your blocks_coords.txt file\n";
 
-my ($qfile, $help, $flip, $man, $core, $ofile, $ref, $tar, $block, $plot);
+my ($afile, $help, $flip, $man, $core, $ofile, $ref, $tar, $block, $plot, $mode, $chrlen);
 my $version=0.1;
 GetOptions(
-    'qfile|q=s' => \$qfile,
+    'afile|a=s' => \$afile,
     'flip|f=n' => \$flip,
     'ref|r=s' => \$ref,
     'tar|t=s' => \$tar,
@@ -25,6 +25,8 @@ GetOptions(
     'plot|p=s' => \$plot,
     'core|c=n' => \$core,
     'ofile|o=s' => \$ofile,
+    'mode|m=s' => \$mode,
+    'lfile|l=s' => \$chrlen,
     'help|h' => \$help
 ) or die &help($version);
 
@@ -32,18 +34,21 @@ GetOptions(
 #pod2usage("$0: \nI am afraid, no files given.")  if ((@ARGV == 0) && (-t STDIN));
 my $coreNum = `grep -c -P '^processor\\s+:' /proc/cpuinfo`;
 if ($core > $coreNum)  {print "Arrr ! Are you kidding me, you have only core $coreNum\n"; exit;}
-if (!$qfile or !$flip or !$core or !$ofile) { help($version) }
+if (!$afile or !$flip or !$core or !$ofile or !$mode) {help($version) }
 
 if ($core > 1) { print "\nWARNING: Might distort the outfile, use more core/thread at your own risk\n---Advised to use 1 thread for now---\n";}
 
 if ($block and $plot) { print "\nSorry plotting function is available with default option of blocks creation\n Try without -b flag\n"; exit; }
+
+
+if (lc($mode) eq "sibelia") { 
 #Seperator
 local $/ = "--------------------------------------------------------------------------------";
 
-open my $qfh, '<', $qfile or die "Unable to open $qfile: $!\n";
+open my $afh, '<', $afile or die "Unable to open $afile: $!\n";
 open my $ofh, '>', $ofile or die "Unable to open $ofile: $!\n";
 my %blocks; my %terms; my $blkCnt;
-while (<$qfh>) {
+while (<$afh>) {
     chomp;
     next if /^\s*$/;
     #Lets store the ids
@@ -52,7 +57,7 @@ while (<$qfh>) {
     $blocks{$blkCnt} = $_;
     #printBlocks ($_, \%terms);
 }
-close $qfh;
+close $afh;
 
 print "\nMaf2Synteny Parsing file finished\nTotal number of blocks $blkCnt\nWorking for formating ...\n";
 
@@ -94,6 +99,64 @@ my $pm =  new Parallel::ForkManager($max_procs);
   close $ofh;
 
 
+sub printBlocks {
+my ($line, $terms_ref)= @_;
+my %terms=%$terms_ref;
+my @val = split /\n/, $line;
+shift @val for 1..3; # Delete the "Blocks# and "Header"
+my $refBlk = shift @val;
+my @refBlkVal = split /\t/, $refBlk;
+if (!$ref) {$ref="REF";}
+if (!$tar) {$tar="TAR";}
+my $refLine='NA';
+
+if ($block eq 'satsuma') { $refLine="$terms{$refBlkVal[0]}\t$refBlkVal[2]\t$refBlkVal[3]"; } 
+elsif ($block eq 'hsb') { $refLine="$ref\t$terms{$refBlkVal[0]}\t$refBlkVal[2]\t$refBlkVal[3]"; }
+else { $refLine="$ref\t$terms{$refBlkVal[0]}\t$refBlkVal[1]\t$refBlkVal[2]\t$refBlkVal[3]\t$refBlkVal[4]"; }
+my $refC = $terms{$refBlkVal[0]};
+my $sname='targetSpsName';
+foreach (@val) {
+	my @v = split /\t/;
+	my @nan= split /\:/, $terms{$v[0]};
+	my $st="NA"; my $ed="NA";
+	if (($flip) and ($v[1] eq "-")) { $st=$v[3]; $ed=$v[2];} else { $st=$v[2]; $ed=$v[3];}
+	my $selfDec='aln';
+	if ($refC eq $terms{$v[0]}) { $selfDec='self';}
+	#satsuma#scaffold_1_1087316_bp	1	2945	scaffold_1-edited	1	2937	0.984715	+
+	if ($block eq 'satsuma') { print $ofh "$refLine\t$terms{$v[0]}\t$st\t$ed\t$v[4]\t$v[1]\n"; }
+	#hsb#galgal:100k	1	31014	8882608	1	5187	8577687	+	anas_platyrhynchos	chromosomes
+	elsif ($block eq 'hsb') {  print $ofh "$refLine\t$tar\t$terms{$v[0]}\t$st\t$ed\t$v[1]\t$sname\tchr/scaff\n"; }
+	#default format see README
+	else { print $ofh "$refLine\t$tar\t$terms{$v[0]}\t$v[1]\t$st\t$ed\t$v[4]\t$selfDec\n"; }
+	}
+}
+}
+
+elsif (lc($mode) eq "lastz") {
+
+#check if user have provided length file
+if (!$chrlen) { print "It seems you forgot to provide length file\n"; }
+#remove overlapping aln
+uniqAln($afile, 'tmpAln');
+my $lenHash_ref=storeLen($chrlen);
+my %lenHash = %$lenHash_ref;
+#print the final format
+open my $afh, '<', 'tmpAln' or die "Unable to open tmpAln: $!\n";
+open my $ofh, '>', $ofile or die "Unable to open $ofile: $!\n";
+while (<$afh>) {
+    chomp;
+    next if /^\s*$/;
+    #Lets store the ids
+    my @aLine = split '\t', $_;
+    my $refL=$aLine[5]-$aLine[4];
+    my $tarL=$aLine[10]-$aLine[9];
+    my $refLen=$lenHash{$aLine[1]};
+    print $ofh "$ref\t$refLen:$aLine[1]\t$aLine[2]\t$aLine[4]\t$aLine[5]\t$refL\t$tar\t$aLine[6]\t$aLine[7]\t$aLine[9]\t$aLine[10]\t$tarL\taln\n";
+}
+close $afh;
+}
+
+
 #Lets begin drawing
 print "Lets plot the graph for chr/contig/scaff $plot : \n";
  my ($sHash_ref, $cSize) = extract2Map($ofile,$plot);
@@ -101,8 +164,58 @@ print "Lets plot the graph for chr/contig/scaff $plot : \n";
  plotSyn('tmp.aln', $plot, $cSize, $sHash_ref);
 
 
-#subs here --------------------------------------------------------------------
 
+
+
+#subs here --------------------------------------------------------------------
+#store len file
+sub storeLen {
+my ($lFile)=@_;
+my %lHash;
+open my $lfh, '<', $lFile;
+while (<$lfh>) {
+    chomp;
+    next if /^\s*$/;
+    my @tmpLen = split '\t', $_;
+    $lHash{$tmpLen[0]}=$tmpLen[1];
+}
+return \%lHash;
+}
+
+#create uniq aln file
+sub uniqAln {
+my ($iName, $oName)=@_;
+open my $ifh, '<', $iName;
+open my $ofh, '>', $oName;
+
+my @terms;
+while (<$ifh>) {
+    chomp;
+    push @terms, [split /\t/];
+}
+
+my $biggest = 0;
+my $id = '';
+
+for my $term (sort sorter @terms) {
+	$biggest = 0 if $id ne $term->[1];
+    if ($term->[5] > $biggest) {
+        my $nLine= join "\t", @$term;
+	print $ofh "$nLine\n";
+        $biggest = $term->[5];
+    }
+    $id = $term->[1];    
+}
+}
+
+#sort the aln
+sub sorter {
+	$a->[1] cmp $b->[1] ||
+     $a->[4] <=> $b->[4]
+  || $b->[5] <=> $a->[5]
+}
+
+#plot synteny
 sub plotSyn {
 my ($tmpFile, $name, $len, $sHash_ref)=@_;
  my %sHash=%$sHash_ref;
@@ -171,39 +284,8 @@ while (<$alnfh>) {
         $cLen=$rName[0];
 	}
 }
+if (!$cLen) { print "Length for $plot is empty -- Check you requested chr/scaff/contig name\n"; exit;}
 return (\%subHash, $cLen);
-}
-
-sub printBlocks {
-my ($line, $terms_ref)= @_;
-my %terms=%$terms_ref;
-my @val = split /\n/, $line;
-shift @val for 1..3; # Delete the "Blocks# and "Header"
-my $refBlk = shift @val;
-my @refBlkVal = split /\t/, $refBlk;
-if (!$ref) {$ref="REF";}
-if (!$tar) {$tar="TAR";}
-my $refLine='NA';
-
-if ($block eq 'satsuma') { $refLine="$terms{$refBlkVal[0]}\t$refBlkVal[2]\t$refBlkVal[3]"; } 
-elsif ($block eq 'hsb') { $refLine="$ref\t$terms{$refBlkVal[0]}\t$refBlkVal[2]\t$refBlkVal[3]"; }
-else { $refLine="$ref\t$terms{$refBlkVal[0]}\t$refBlkVal[1]\t$refBlkVal[2]\t$refBlkVal[3]\t$refBlkVal[4]"; }
-my $refC = $terms{$refBlkVal[0]};
-my $sname='targetSpsName';
-foreach (@val) {
-	my @v = split /\t/;
-	my @nan= split /\:/, $terms{$v[0]};
-	my $st="NA"; my $ed="NA";
-	if (($flip) and ($v[1] eq "-")) { $st=$v[3]; $ed=$v[2];} else { $st=$v[2]; $ed=$v[3];}
-	my $selfDec='aln';
-	if ($refC eq $terms{$v[0]}) { $selfDec='self';}
-	#satsuma#scaffold_1_1087316_bp	1	2945	scaffold_1-edited	1	2937	0.984715	+
-	if ($block eq 'satsuma') { print $ofh "$refLine\t$terms{$v[0]}\t$st\t$ed\t$v[4]\t$v[1]\n"; }
-	#hsb#galgal:100k	1	31014	8882608	1	5187	8577687	+	anas_platyrhynchos	chromosomes
-	elsif ($block eq 'hsb') {  print $ofh "$refLine\t$tar\t$terms{$v[0]}\t$st\t$ed\t$v[1]\t$sname\tchr/scaff\n"; }
-	#default format see README
-	else { print $ofh "$refLine\t$tar\t$terms{$v[0]}\t$v[1]\t$st\t$ed\t$v[4]\t$selfDec\n"; }
-	}
 }
 
 #store subs
@@ -221,9 +303,9 @@ sub help {
   print "\n SyntenyParser.pl $ver\n";
   print "\n Report errors/bug to Jitendra 'jnarayan81ATgmail.com'\n\n";
 
-  print "Usage: $0 --qfile --flip 1 \n\n";
+  print "Usage: $0 --afile --flip 1 \n\n";
   print	"Options:\n";
-  print "	--qfile|-q	query Maf2Synteny blocks_coords file\n";
+  print "	--afile|-a	alignment 'Maf2Synteny blocks_coords/lastz general' file\n";
   print "	--flip|-f	flip the coordiantes if negative oriented | 1 for yes or 0 for no \n";
   print "	--core|-c	Number of core/core to use \n";
   print "	--ofile|-o	oufile/results file\n";
@@ -231,8 +313,13 @@ sub help {
   print "	--tar|-t	target name\n";
   print "	--plot|-p	name of scaff to plot\n";
   print "	--block|-b	report block format\n";
+  print "	--lfile|-l	provide chr length file\n";
+  print "	--mode|-m	provide alingnment mode\n";
   print "     	--help|-h	brief help message\n";
 
+print "For LastZ general-: perl SyntenyParser.pl -a seeALN_scaffold_15.lz -f 1 -c 1 -o see2 -r ref -t tar -p scaffold_15 -m lastz -l scaff15.fa.fai
+";
+print "For Sibelia: perl SyntenyParser.pl -a blocks_coords.txt -f 1 -c 1 -o see2 -r ref -t tar -p scaffold_1 -m sibelia";
 exit;
 }
 
