@@ -16,6 +16,13 @@ SyntenyParser script usage
   print "	--plot|-p	name of scaff to plot\n";
   print "	--block|-b	report block format : for default see below\n";
   print "     	--help|-h	brief help message\n";
+  print "	--lfile|-l	provide chr length file\n";
+  print "	--mode|-m	provide alingnment mode\n";
+  print "     	--help|-h	brief help message\n";
+
+print "For LastZ general-: perl SyntenyParser.pl -a seeALN_scaffold_15.lz -f 1 -c 1 -o see2 -r ref -t tar -p scaffold_15 -m lastz -l scaff15.fa.fai
+";
+print "For Sibelia: perl SyntenyParser.pl -a blocks_coords.txt -f 1 -c 1 -o see2 -r ref -t tar -p scaffold_1 -m sibelia";
 
 ```
 
