@@ -229,7 +229,7 @@ my $size  = $map->get_map_size;
 my $units = $map->get_map_units; 
 print "Map size: $size $units\n";
  
-my $qtl_track  = Chromosome::Map::Track->new (-name => 'QTL',
+my $qtl_track  = Chromosome::Map::Track->new (-name => 'ALN',
                                                -type => 'interval',
                                               );
 # adding tracks to map
@@ -244,7 +244,8 @@ print "Nb track: $nb_track\n";
 foreach my $sBlocks (keys %sHash) {
      my @sBlocks = split '\t', $sHash{$sBlocks};
      my @tmpName=split '\:', $sBlocks[7]; #Tar name
-     my $localName="$tmpName[1]:$sBlocks[3]-$sBlocks[4]";
+     my $localName='NA';
+     if($mode eq "sibelia") { $localName="$tmpName[1]:$sBlocks[3]-$sBlocks[4]"; } elsif ($mode eq "lastz") {$localName="$sBlocks[7]:$sBlocks[3]-$sBlocks[4]";} else {$localName='NA';}
      my $lColor='black';
      if ($sBlocks[8] eq '-') { $lColor= 'red';} else {$lColor= 'darkgoldenrod';}
      my $qtl1 = Chromosome::Map::Block->new (-name  => $localName,
