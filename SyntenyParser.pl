@@ -7,6 +7,7 @@ Getopt::Long::Configure qw(gnu_getopt);
 use Pod::Usage;
 use Parallel::ForkManager;
 use Chromosome::Map;
+use File::Copy;
  
 # maf2synteny parser
 #Author: Jitendra Narayan
@@ -14,7 +15,7 @@ use Chromosome::Map;
 
 #print "\nNOTE: The script assume each blocks number has two only lines in your blocks_coords.txt file\n";
 
-my ($afile, $help, $flip, $man, $core, $ofile, $ref, $tar, $block, $plot, $mode, $chrlen);
+my ($afile, $help, $flip, $man, $core, $ofile, $ref, $tar, $block, $plot, $mode, $chrlen, $uniq);
 my $version=0.1;
 GetOptions(
     'afile|a=s' => \$afile,
@@ -26,6 +27,7 @@ GetOptions(
     'core|c=n' => \$core,
     'ofile|o=s' => \$ofile,
     'mode|m=s' => \$mode,
+    'uniq|u=s' => \$uniq,
     'lfile|l=s' => \$chrlen,
     'help|h' => \$help
 ) or die &help($version);
@@ -137,7 +139,7 @@ elsif (lc($mode) eq "lastz") {
 #check if user have provided length file
 if (!$chrlen) { print "It seems you forgot to provide length file\n"; }
 #remove overlapping aln
-uniqAln($afile, 'tmpAln');
+if ($uniq eq 'yes') { uniqAln($afile, 'tmpAln'); } else { copy($afile, 'tmpAln') or die "Copy failed: $!";}
 my $lenHash_ref=storeLen($chrlen);
 my %lenHash = %$lenHash_ref;
 #print the final format
@@ -316,9 +318,10 @@ sub help {
   print "	--block|-b	report block format\n";
   print "	--lfile|-l	provide chr length file\n";
   print "	--mode|-m	provide alingnment mode\n";
+  print "	--uniq|-u	remove the overlapping blocks and keep to longest\n";
   print "     	--help|-h	brief help message\n";
 
-print "For LastZ general-: perl SyntenyParser.pl -a seeALN_scaffold_15.lz -f 1 -c 1 -o see2 -r ref -t tar -p scaffold_15 -m lastz -l scaff15.fa.fai
+print "For LastZ general-: perl SyntenyParser.pl -a seeALN_scaffold_15.lz -f 1 -c 1 -o see2 -r ref -t tar -u yes -p scaffold_15 -m lastz -l scaff15.fa.fai
 ";
 print "For Sibelia: perl SyntenyParser.pl -a blocks_coords.txt -f 1 -c 1 -o see2 -r ref -t tar -p scaffold_1 -m sibelia";
 exit;
